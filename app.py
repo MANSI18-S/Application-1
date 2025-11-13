@@ -40,7 +40,24 @@ def add_portfolio(username, data):
     portfolios = db["portfolios"]
     portfolios.insert_one({"username": username, "data": data})
 
-# ------------------- UI Components -------------------
+# ------------------- Admin Auto-Creation -------------------
+def ensure_admin_exists():
+    db = get_db()
+    users = db["users"]
+    admin = users.find_one({"username": "admin"})
+    if not admin:
+        hashed = bcrypt.hashpw("mansi1515".encode(), bcrypt.gensalt())
+        users.insert_one({
+            "username": "admin",
+            "password": hashed,
+            "role": "admin"
+        })
+        print("✅ Admin account created (username: admin, password: mansi1515)")
+
+# Run admin creation once
+ensure_admin_exists()
+
+# ------------------- Streamlit App -------------------
 st.set_page_config(page_title="Stock Portfolio App", layout="centered")
 st.title("📈 Stock Portfolio Dashboard")
 
@@ -63,7 +80,6 @@ def login_page():
             st.session_state.logged_in = True
             st.session_state.username = username
             st.session_state.role = role
-            st.success(f"Welcome {username}!")
             st.session_state.page = "portfolio"
             st.experimental_rerun()
         else:
@@ -126,25 +142,4 @@ def portfolio_page():
             st.json(p.get("data", {}))
             st.divider()
     else:
-        st.info("No portfolio data found.")
-
-    st.write("---")
-    st.subheader("➕ Add Portfolio Entry")
-    stock_name = st.text_input("Stock Name")
-    stock_value = st.number_input("Stock Value", min_value=0.0, step=0.01)
-    if st.button("Add Stock"):
-        add_portfolio(
-            st.session_state.username,
-            {"stock": stock_name, "value": stock_value}
-        )
-        st.success("Stock added successfully!")
-        st.experimental_rerun()
-
-# ------------------- Routing -------------------
-if not st.session_state.logged_in:
-    if st.session_state.page == "login":
-        login_page()
-    elif st.session_state.page == "register":
-        register_page()
-else:
-    portfolio_page()
+        st.in
