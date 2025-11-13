@@ -40,7 +40,7 @@ def add_portfolio(username, data):
     portfolios = db["portfolios"]
     portfolios.insert_one({"username": username, "data": data})
 
-# ------------------- Admin Auto-Creation -------------------
+# ------------------- Ensure Admin Exists -------------------
 def ensure_admin_exists():
     db = get_db()
     users = db["users"]
@@ -54,13 +54,13 @@ def ensure_admin_exists():
         })
         print("✅ Admin account created (username: admin, password: mansi1515)")
 
-# Run admin creation once
 ensure_admin_exists()
 
-# ------------------- Streamlit App -------------------
+# ------------------- Streamlit Setup -------------------
 st.set_page_config(page_title="Stock Portfolio App", layout="centered")
 st.title("📈 Stock Portfolio Dashboard")
 
+# Initialize session state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
@@ -70,76 +70,5 @@ if "logged_in" not in st.session_state:
 # ----------- Login Page -----------
 def login_page():
     st.subheader("🔐 Login")
-
     username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        success, role = authenticate_user(username, password)
-        if success:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.session_state.role = role
-            st.session_state.page = "portfolio"
-            st.experimental_rerun()
-        else:
-            st.error("Invalid username or password")
-
-    if st.button("Register New Account"):
-        st.session_state.page = "register"
-        st.experimental_rerun()
-
-# ----------- Register Page -----------
-def register_page():
-    st.subheader("🧾 Register New Account")
-
-    username = st.text_input("Create Username")
-    password = st.text_input("Create Password", type="password")
-    confirm = st.text_input("Confirm Password", type="password")
-
-    if st.button("Create Account"):
-        if not username or not password:
-            st.error("Please enter all fields")
-        elif password != confirm:
-            st.error("Passwords do not match")
-        else:
-            success, msg = create_user(username, password)
-            if success:
-                st.success(msg)
-                st.session_state.page = "login"
-                st.experimental_rerun()
-            else:
-                st.error(msg)
-
-    if st.button("Back to Login"):
-        st.session_state.page = "login"
-        st.experimental_rerun()
-
-# ----------- Portfolio Page -----------
-def portfolio_page():
-    st.sidebar.title(f"👋 {st.session_state.username}")
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.username = None
-        st.session_state.role = None
-        st.session_state.page = "login"
-        st.experimental_rerun()
-
-    is_admin = st.session_state.role == "admin"
-
-    if is_admin:
-        st.subheader("🛠 Admin Panel - All User Portfolios")
-    else:
-        st.subheader("📊 Your Portfolio")
-
-    portfolios = get_portfolios(
-        username=st.session_state.username, is_admin=is_admin
-    )
-
-    if portfolios:
-        for p in portfolios:
-            st.write(f"**User:** {p['username']}")
-            st.json(p.get("data", {}))
-            st.divider()
-    else:
-        st.in
+    password = st.text_input("Password",_
