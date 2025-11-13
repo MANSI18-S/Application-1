@@ -1,74 +1,71 @@
 import streamlit as st
 from pymongo import MongoClient
-import bcrypt
+import pandas as pd
 
-# ------------------- MongoDB Connection -------------------
+# --- APP CONFIG ---
+st.set_page_config(page_title="Stocks Portfolio", page_icon="📊", layout="wide")
+
+# --- CONNECT TO MONGO ---
 @st.cache_resource
-def get_db():
-    uri = st.secrets["mongo"]["uri"]
-    db_name = st.secrets["mongo"]["db_name"]
-    client = MongoClient(uri)
-    return client[db_name]
+def get_mongo_client():
+    mongo_uri = st.secrets["mongo"]["uri"]
+    return MongoClient(mongo_uri)
 
-# ------------------- User Management -------------------
-def create_user(username, password, role="user"):
-    db = get_db()
-    users = db["users"]
-    if users.find_one({"username": username}):
-        return False, "Username already exists"
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    users.insert_one({"username": username, "password": hashed, "role": role})
-    return True, "User created successfully"
+client = get_mongo_client()
+db = client["portfolio_db"]
+users_col = db["users"]
 
-def authenticate_user(username, password):
-    db = get_db()
-    user = db["users"].find_one({"username": username})
-    if user and bcrypt.checkpw(password.encode(), user["password"]):
-        return True, user["role"]
-    return False, None
+# --- AUTHENTICATION ---
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "mansi1515"
 
-# ------------------- Portfolio Data -------------------
-def get_portfolios(username=None, is_admin=False):
-    db = get_db()
-    portfolios = db["portfolios"]
-    if is_admin:
-        return list(portfolios.find({}))
-    return list(portfolios.find({"username": username}))
+st.title("📊 Stocks Portfolio Login")
 
-def add_portfolio(username, data):
-    db = get_db()
-    portfolios = db["portfolios"]
-    portfolios.insert_one({"username": username, "data": data})
+# --- LOGIN FORM ---
+login_choice = st.sidebar.radio("Select Option", ["Login", "Register"])
 
-# ------------------- Ensure Admin Exists -------------------
-def ensure_admin_exists():
-    db = get_db()
-    users = db["users"]
-    admin = users.find_one({"username": "admin"})
-    if not admin:
-        hashed = bcrypt.hashpw("mansi1515".encode(), bcrypt.gensalt())
-        users.insert_one({
-            "username": "admin",
-            "password": hashed,
-            "role": "admin"
-        })
-        print("✅ Admin account created (username: admin, password: mansi1515)")
+if login_choice == "Register":
+    st.subheader("Create a New Account")
+    new_user = st.text_input("Enter username")
+    new_pass = st.text_input("Enter password", type="password")
+    if st.button("Register"):
+        if users_col.find_one({"username": new_user}):
+            st.warning("User already exists!")
+        else:
+            users_col.insert_one({"username": new_user, "password": new_pass, "stocks": []})
+            st.success("Account created successfully! Please log in.")
 
-ensure_admin_exists()
-
-# ------------------- Streamlit Setup -------------------
-st.set_page_config(page_title="Stock Portfolio App", layout="centered")
-st.title("📈 Stock Portfolio Dashboard")
-
-# Initialize session state
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = None
-    st.session_state.page = "login"
-
-# ----------- Login Page -----------
-def login_page():
-    st.subheader("🔐 Login")
+elif login_choice == "Login":
+    st.subheader("Login to Your Account")
     username = st.text_input("Username")
-    password = st.text_input("Password",_
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            st.success("Welcome, Admin!")
+            st.subheader("All User Data")
+            users = list(users_col.find({}, {"_id": 0, "password": 0}))
+            if users:
+                st.dataframe(pd.DataFrame(users))
+            else:
+                st.info("No user data found.")
+        else:
+            user = users_col.find_one({"username": username, "password": password})
+            if user:
+                st.success(f"Welcome, {username}!")
+                st.subheader("Your Portfolio")
+                user_stocks = user.get("stocks", [])
+                st.write(pd.DataFrame(user_stocks) if user_stocks else "No stocks added yet.")
+
+                with st.expander("➕ Add Stock"):
+                    symbol = st.text_input("Stock Symbol")
+                    quantity = st.number_input("Quantity", min_value=1)
+                    price = st.number_input("Purchase Price", min_value=0.0)
+                    if st.button("Add Stock"):
+                        users_col.update_one(
+                            {"username": username},
+                            {"$push": {"stocks": {"symbol": symbol, "quantity": quantity, "price": price}}}
+                        )
+                        st.success("Stock added successfully!")
+            else:
+                st.error("Invalid username or password.")
